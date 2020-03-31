@@ -102,10 +102,14 @@ try:
     from pygame.locals import K_TAB
     from pygame.locals import K_UP
     from pygame.locals import K_a
+    from pygame.locals import K_b
     from pygame.locals import K_c
     from pygame.locals import K_d
     from pygame.locals import K_h
+    from pygame.locals import K_k
+    from pygame.locals import K_l
     from pygame.locals import K_m
+    from pygame.locals import K_n
     from pygame.locals import K_p
     from pygame.locals import K_q
     from pygame.locals import K_r
@@ -121,6 +125,13 @@ try:
 except ImportError:
     raise RuntimeError('cannot import numpy, make sure numpy package is installed')
 
+# Global variables
+stage = 1
+bRecording = False
+bReplaying = False
+bAutoloop = False
+egoVehicle = None
+otherVehicle = None
 
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
@@ -264,6 +275,14 @@ class KeyboardControl(object):
                     world.next_weather(reverse=True)
                 elif event.key == K_c:
                     world.next_weather()
+                elif event.key == K_b:
+                    # record
+                elif event.key == K_k:
+                    # toggle ego/other vehicle
+                elif event.key == K_n:
+                    # replay
+                elif event.key == K_l:
+                    # restart level
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key > K_0 and event.key <= K_9:
