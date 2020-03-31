@@ -9,6 +9,8 @@
 # Allows controlling a vehicle with a keyboard. For a simpler and more
 # documented example, please take a look at tutorial.py.
 
+# In-Trace Control tool developed by hifi
+
 """
 Welcome to CARLA manual control.
 
