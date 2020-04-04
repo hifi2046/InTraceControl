@@ -414,6 +414,7 @@ class HUD(object):
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
+        print( clock.get_time())
         if not self._show_info:
             return
         t = world.player.get_transform()
