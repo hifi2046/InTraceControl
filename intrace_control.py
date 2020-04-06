@@ -25,6 +25,11 @@ Use ARROWS or WASD keys for control.
     M            : toggle manual transmission
     ,/.          : gear up/down
 
+    B            : toggle in trace recording
+    N            : in trace replaying
+    L            : restart level
+    K            : toggle ego/other vehicle
+
     TAB          : change sensor position
     `            : next sensor
     [1-9]        : change to sensor [1-9]
@@ -128,7 +133,11 @@ except ImportError:
 # Global variables
 stage = 1
 bRecording = False
+bufRecord = []
+fRecord = None
 bReplaying = False
+bufReplay = []
+nReplay = 0
 bAutoloop = False
 egoVehicle = None
 otherVehicle = None
@@ -179,7 +188,7 @@ class World(object):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
         # Get a random blueprint.
-        blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
+        blueprint = self.world.get_blueprint_library().filter(self._actor_filter)[3]
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
@@ -194,7 +203,7 @@ class World(object):
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         while self.player is None:
             spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+            spawn_point = spawn_points[0] if spawn_points else carla.Transform()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
@@ -257,6 +266,8 @@ class KeyboardControl(object):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock):
+        global bRecording, bufRecord, fRecord
+        global bReplaying, bufReplay, nReplay
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -277,12 +288,26 @@ class KeyboardControl(object):
                     world.next_weather()
                 elif event.key == K_b:
                     # record
+                    bRecording = not bRecording
+                    if( bRecording):
+                        bufRecord = []
+                        fRecord = open("record.log", "w")
+                    else:
+                        for line in bufRecord:
+                            fRecord.write(line+"\n")
+                        fRecord.close()
                 elif event.key == K_k:
-                    # toggle ego/other vehicle
+                    1# toggle ego/other vehicle
                 elif event.key == K_n:
                     # replay
+                    bReplaying = True
+                    nReplay = 0
+                    fReplay = open("record.log", "r")
+                    buf = fReplay.readlines()
+                    bufReplay = [d[:-1].split("|") for d in buf]
+                    world.restart()
                 elif event.key == K_l:
-                    # restart level
+                    1# restart level
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key > K_0 and event.key <= K_9:
@@ -340,6 +365,18 @@ class KeyboardControl(object):
                         self._autopilot_enabled = not self._autopilot_enabled
                         world.player.set_autopilot(self._autopilot_enabled)
                         world.hud.notification('Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
+        # apply in trace control
+        if bReplaying:
+            t = bufReplay[nReplay]
+            self._control.throttle = float(t[0])
+            self._control.steer = float(t[1])
+            self._control.brake = float(t[2])
+            world.player.apply_control(self._control)
+            nReplay += 1
+            if( nReplay >= len(bufReplay)):
+                bReplaying = False
+                nReplay = 0
+            return
         if not self._autopilot_enabled:
             if isinstance(self._control, carla.VehicleControl):
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
@@ -414,12 +451,15 @@ class HUD(object):
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
-        print( clock.get_time())
         if not self._show_info:
             return
         t = world.player.get_transform()
         v = world.player.get_velocity()
         c = world.player.get_control()
+        if bRecording:
+            temp = "%.5s|%.5s|%.5s" % (c.throttle, c.steer, c.brake)
+            print(temp)
+            bufRecord.append(temp)
         heading = 'N' if abs(t.rotation.yaw) < 89.5 else ''
         heading += 'S' if abs(t.rotation.yaw) > 90.5 else ''
         heading += 'E' if 179.5 > t.rotation.yaw > 0.5 else ''
