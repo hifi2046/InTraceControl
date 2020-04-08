@@ -138,6 +138,8 @@ fRecord = None
 bReplaying = False
 bufReplay = []
 nReplay = 0
+timeRecord = 0
+timeReplay = 0
 bAutoloop = False
 egoVehicle = None
 otherVehicle = None
@@ -188,17 +190,19 @@ class World(object):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
         # Get a random blueprint.
-        blueprint = self.world.get_blueprint_library().filter(self._actor_filter)[3]
+        blueprint = self.world.get_blueprint_library().filter("vehicle.bmw.isetta*")[0]
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
         # Spawn the player.
         if self.player is not None:
-            spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
-            spawn_point.rotation.roll = 0.0
-            spawn_point.rotation.pitch = 0.0
+            #spawn_point = self.player.get_transform()
+            #spawn_point.location.z += 2.0
+            #spawn_point.rotation.roll = 0.0
+            #spawn_point.rotation.pitch = 0.0
+            spawn_points = self.map.get_spawn_points()
+            spawn_point = spawn_points[0] if spawn_points else carla.Transform()
             self.destroy()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         while self.player is None:
@@ -268,6 +272,7 @@ class KeyboardControl(object):
     def parse_events(self, client, world, clock):
         global bRecording, bufRecord, fRecord
         global bReplaying, bufReplay, nReplay
+        global timeRecord, timeReplay
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -302,6 +307,9 @@ class KeyboardControl(object):
                     # replay
                     bReplaying = True
                     nReplay = 0
+                    timeRecord = 0
+                    timeReplay = 0
+                    clock.get_time()
                     fReplay = open("record.log", "r")
                     buf = fReplay.readlines()
                     bufReplay = [d[:-1].split("|") for d in buf]
@@ -368,14 +376,23 @@ class KeyboardControl(object):
         # apply in trace control
         if bReplaying:
             t = bufReplay[nReplay]
-            self._control.throttle = float(t[0])
-            self._control.steer = float(t[1])
-            self._control.brake = float(t[2])
+            self._control.throttle = float(t[1])
+            self._control.steer = float(t[2])
+            self._control.brake = float(t[3])
             world.player.apply_control(self._control)
-            nReplay += 1
-            if( nReplay >= len(bufReplay)):
-                bReplaying = False
-                nReplay = 0
+            deltaNow = clock.get_time()
+            timeReplay += deltaNow
+            print( deltaNow, t )
+            while( timeReplay >= timeRecord ):
+                nReplay += 1
+                if( nReplay >= len(bufReplay)):
+                    bReplaying = False
+                    nReplay = 0
+                    return
+                t = bufReplay[nReplay]
+                delta = int(t[0])
+                timeRecord += delta
+                print("next",)
             return
         if not self._autopilot_enabled:
             if isinstance(self._control, carla.VehicleControl):
@@ -457,7 +474,7 @@ class HUD(object):
         v = world.player.get_velocity()
         c = world.player.get_control()
         if bRecording:
-            temp = "%.5s|%.5s|%.5s" % (c.throttle, c.steer, c.brake)
+            temp = "%s|%.5s|%.5s|%.5s" % (clock.get_time(), c.throttle, c.steer, c.brake)
             print(temp)
             bufRecord.append(temp)
         heading = 'N' if abs(t.rotation.yaw) < 89.5 else ''
