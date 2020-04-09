@@ -136,13 +136,19 @@ bRecording = False
 bufRecord = []
 fRecord = None
 bReplaying = False
+bReplayingOther = False
 bufReplay = []
+bufReplayOther = []
 nReplay = 0
+nReplayOther = 0
 timeRecord = 0
 timeReplay = 0
+# timeReplayOther = 0
+timeRecordOther = 0
 bAutoloop = False
 egoVehicle = None
 otherVehicle = None
+currentVehicle = 0
 
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
@@ -185,7 +191,31 @@ class World(object):
         self.recording_enabled = False
         self.recording_start = 0
 
+    def setCamera(self):
+        actors = [
+            self.camera_manager.sensor,
+            self.collision_sensor.sensor,
+            self.lane_invasion_sensor.sensor,
+            self.gnss_sensor.sensor]
+        for actor in actors:
+            if actor is not None:
+                actor.destroy()
+
+        # Keep same camera config if the camera manager exists.
+        cam_index = self.camera_manager.index if self.camera_manager is not None else 0
+        cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
+        # Set up the sensors.
+        self.collision_sensor = CollisionSensor(self.player, self.hud)
+        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+        self.gnss_sensor = GnssSensor(self.player)
+        self.camera_manager = CameraManager(self.player, self.hud)
+        self.camera_manager.transform_index = cam_pos_index
+        self.camera_manager.set_sensor(cam_index, notify=False)
+        actor_type = get_actor_display_name(self.player)
+        self.hud.notification(actor_type)
+        
     def restart(self):
+        global currentVehicle, egoVehicle, otherVehicle
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -193,22 +223,23 @@ class World(object):
         blueprint = self.world.get_blueprint_library().filter("vehicle.bmw.isetta*")[0]
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
+            color = blueprint.get_attribute('color').recommended_values[2]
             blueprint.set_attribute('color', color)
         # Spawn the player.
         if self.player is not None:
-            #spawn_point = self.player.get_transform()
-            #spawn_point.location.z += 2.0
-            #spawn_point.rotation.roll = 0.0
-            #spawn_point.rotation.pitch = 0.0
-            spawn_points = self.map.get_spawn_points()
-            spawn_point = spawn_points[0] if spawn_points else carla.Transform()
             self.destroy()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-        while self.player is None:
-            spawn_points = self.map.get_spawn_points()
-            spawn_point = spawn_points[0] if spawn_points else carla.Transform()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
+        spawn_points = self.map.get_spawn_points()
+        spawn_point = spawn_points[0] if spawn_points else carla.Transform()
+        egoVehicle = self.world.try_spawn_actor(blueprint, spawn_point)
+        color = blueprint.get_attribute('color').recommended_values[0]
+        blueprint.set_attribute('color', color)
+        spawn_point.location.x += 4.0
+        spawn_point.location.y += 2.0
+        otherVehicle = self.world.try_spawn_actor(blueprint, spawn_point)
+        if currentVehicle == 0:
+            self.player = egoVehicle
+        else:
+            self.player = otherVehicle
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
@@ -244,7 +275,9 @@ class World(object):
             self.collision_sensor.sensor,
             self.lane_invasion_sensor.sensor,
             self.gnss_sensor.sensor,
-            self.player]
+            self.player,
+            egoVehicle,
+            otherVehicle]
         for actor in actors:
             if actor is not None:
                 actor.destroy()
@@ -271,8 +304,9 @@ class KeyboardControl(object):
 
     def parse_events(self, client, world, clock):
         global bRecording, bufRecord, fRecord
-        global bReplaying, bufReplay, nReplay
-        global timeRecord, timeReplay
+        global bReplaying, bufReplay, nReplay, bufReplayOther, nReplayOther, bReplayingOther
+        global timeRecord, timeReplay, timeRecordOther
+        global currentVehicle, egoVehicle, otherVehicle
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -296,23 +330,42 @@ class KeyboardControl(object):
                     bRecording = not bRecording
                     if( bRecording):
                         bufRecord = []
-                        fRecord = open("record.log", "w")
+                        if currentVehicle == 0:
+                            fRecord = open("record.log", "w")
+                        else:
+                            fRecord = open("record-other.log", "w")
                     else:
                         for line in bufRecord:
                             fRecord.write(line+"\n")
                         fRecord.close()
                 elif event.key == K_k:
-                    1# toggle ego/other vehicle
+                    # toggle ego/other vehicle
+                    if currentVehicle == 0: # ego
+                        currentVehicle = 1
+                        world.player = otherVehicle
+                    else: # other
+                        currentVehicle = 0
+                        world.player = egoVehicle
+                    world.setCamera()
                 elif event.key == K_n:
                     # replay
                     bReplaying = True
+                    bReplayingOther = True
                     nReplay = 0
+                    nReplayOther = 0
                     timeRecord = 0
+                    timeRecordOther = 0
                     timeReplay = 0
                     clock.get_time()
                     fReplay = open("record.log", "r")
                     buf = fReplay.readlines()
+                    fReplay.close()
                     bufReplay = [d[:-1].split("|") for d in buf]
+                    fReplay = open("record-other.log", "r")
+                    buf = fReplay.readlines()
+                    fReplay.close()
+                    bufReplayOther = [d[:-1].split("|") for d in buf]
+                    print(len(bufReplayOther))
                     world.restart()
                 elif event.key == K_l:
                     1# restart level
@@ -374,25 +427,45 @@ class KeyboardControl(object):
                         world.player.set_autopilot(self._autopilot_enabled)
                         world.hud.notification('Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
         # apply in trace control
-        if bReplaying:
+        if bReplaying or bReplayingOther:
+            # ego replay step
             t = bufReplay[nReplay]
             self._control.throttle = float(t[1])
             self._control.steer = float(t[2])
             self._control.brake = float(t[3])
-            world.player.apply_control(self._control)
+            egoVehicle.apply_control(self._control)
+            # other replay step
+            tt = bufReplayOther[nReplayOther]
+            _control = carla.VehicleControl()
+            _control.throttle = float(tt[1])
+            _control.steer = float(tt[2])
+            _control.brake = float(tt[3])
+            otherVehicle.apply_control(_control)
+            # real time step
             deltaNow = clock.get_time()
             timeReplay += deltaNow
-            print( deltaNow, t )
+            # print( deltaNow, t, tt )
             while( timeReplay >= timeRecord ):
                 nReplay += 1
                 if( nReplay >= len(bufReplay)):
                     bReplaying = False
                     nReplay = 0
-                    return
+                    break
                 t = bufReplay[nReplay]
                 delta = int(t[0])
                 timeRecord += delta
-                print("next",)
+                #print("next",)
+            while( timeReplay >= timeRecordOther ):
+                nReplayOther += 1
+                if( nReplayOther >= len(bufReplayOther)):
+                    bReplayingOther = False
+                    nReplayOther = 0
+                    break
+                tt = bufReplayOther[nReplayOther]
+                delta = int(tt[0])
+                timeRecordOther += delta
+                #print("nextO",)
+        if bReplaying or bReplayingOther:
             return
         if not self._autopilot_enabled:
             if isinstance(self._control, carla.VehicleControl):
