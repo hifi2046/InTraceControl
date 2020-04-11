@@ -430,17 +430,17 @@ class KeyboardControl(object):
         if bReplaying or bReplayingOther:
             # ego replay step
             t = bufReplay[nReplay]
-            self._control.throttle = float(t[1])
-            self._control.steer = float(t[2])
-            self._control.brake = float(t[3])
-            egoVehicle.apply_control(self._control)
+#            self._control.throttle = float(t[1])
+#            self._control.steer = float(t[2])
+#            self._control.brake = float(t[3])
+#            egoVehicle.apply_control(self._control)
             # other replay step
             tt = bufReplayOther[nReplayOther]
-            _control = carla.VehicleControl()
-            _control.throttle = float(tt[1])
-            _control.steer = float(tt[2])
-            _control.brake = float(tt[3])
-            otherVehicle.apply_control(_control)
+#            _control = carla.VehicleControl()
+#            _control.throttle = float(tt[1])
+#            _control.steer = float(tt[2])
+#            _control.brake = float(tt[3])
+#            otherVehicle.apply_control(_control)
             # real time step
             deltaNow = clock.get_time()
             timeReplay += deltaNow
@@ -452,6 +452,10 @@ class KeyboardControl(object):
                     nReplay = 0
                     break
                 t = bufReplay[nReplay]
+                self._control.throttle = float(t[1])
+                self._control.steer = float(t[2])
+                self._control.brake = float(t[3])
+                egoVehicle.apply_control(self._control)
                 delta = int(t[0])
                 timeRecord += delta
                 #print("next",)
@@ -462,6 +466,11 @@ class KeyboardControl(object):
                     nReplayOther = 0
                     break
                 tt = bufReplayOther[nReplayOther]
+                _control = carla.VehicleControl()
+                _control.throttle = float(tt[1])
+                _control.steer = float(tt[2])
+                _control.brake = float(tt[3])
+                otherVehicle.apply_control(_control)
                 delta = int(tt[0])
                 timeRecordOther += delta
                 #print("nextO",)
