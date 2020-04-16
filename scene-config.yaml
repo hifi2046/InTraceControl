@@ -1,0 +1,12 @@
+- filename: record-0.log
+  location: [203.2, -259.8, 2.2]
+  rotation: [0, -88, 0]
+  start_time: 0
+  type: isetta
+  color: red
+- filename: record-1.log
+  location: [155.7, -305.8, 2.2]
+  rotation: [0, -8, 0]
+  start_time: 400
+  type: isetta
+  color: blue

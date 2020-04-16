@@ -1,11 +1,11 @@
-- filename: log/s1-ego.log
-  location: [225.3, -364.1, 1.2]
+- filename: record-0.log
+  location: [225.3, -364.1, 2.2]
   rotation: [0, -0.3, 0]
   start_time: 0
   type: isetta
   color: red
-- filename: log/s1-other.log
-  location: [227.8, -368, 1.2]
+- filename: record-0.log
+  location: [215.3, -364.1, 2.2]
   rotation: [0, -0.3, 0]
   start_time: 0
   type: isetta
