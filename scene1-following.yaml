@@ -1,0 +1,12 @@
+- filename: log/s1-ego.log
+  location: []
+  rotation: []
+  start_time: 0
+  vehicle_type: isetta
+  vehicle_color: red
+- filename: log/s1-other.log
+  location: []
+  rotation: []
+  start_time: 0
+  vehicle_type: isetta
+  vehicle_color: blue
