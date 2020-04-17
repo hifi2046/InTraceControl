@@ -216,7 +216,7 @@ class World(object):
     def restart(self):
         global currentVehicle, egoVehicle, otherVehicle, sconfig, vehicles
         global bufferReplay, timeOffset
-        colormap={"red":"255,33,0", "blue":"21,158,255", "yellow":"255,208,0", "azure":"145,255,181", "green":"181,255,0"}
+        colormap={"red":"255,33,0", "blue":"21,158,255", "yellow":"255,208,0", "lightgreen":"145,255,181", "green":"145,255,181", "black":"0,0,0", "white":"255,255,255", "orange":"253,136,0", "pink":"255,160,145", "purple":"122,61,224"}
         # load scene config
         fconfig = open("scene-config.yaml", "r")
         data = fconfig.read()
