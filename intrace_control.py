@@ -131,6 +131,10 @@ try:
 except ImportError:
     raise RuntimeError('cannot import numpy, make sure numpy package is installed')
 
+import xodrReader
+
+xodrReader.load()
+
 # Global variables
 stage = 1
 bRecording = False
@@ -541,6 +545,15 @@ class HUD(object):
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
         vehicles = world.world.get_actors().filter('vehicle.*')
+        # add road info
+        rinfo = xodrReader.roadinfo
+        map = world.world.get_map()
+        wp = map.get_waypoint(t.location)
+        rid = wp.road_id
+        lid = wp.lane_id
+        rd = rinfo[rid]
+        bJunc = wp.is_junction
+        ju = wp.get_junction()
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps(),
@@ -554,6 +567,9 @@ class HUD(object):
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % t.location.z,
+            '',
+            'Road %d!%d' % (rid, lid) + ' (%.1f,%.1f) len %f wid %f hdg %f' % rd,
+            'Junc %d' % ju.id if bJunc else '',
             '']
         if isinstance(c, carla.VehicleControl):
             self._info_text += [
