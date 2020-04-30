@@ -132,6 +132,7 @@ except ImportError:
     raise RuntimeError('cannot import numpy, make sure numpy package is installed')
 
 import xodrReader
+import rssw
 
 xodrReader.load()
 
@@ -434,6 +435,7 @@ class KeyboardControl(object):
             timeReplay += deltaNow
             # replay time step
             n =0
+            bFirstVehicle = True
             for v in vehicles:
                 while( timeReplay >= timeRecord[n] + timeOffset[n] ):
                     nReplay[n] += 1
@@ -446,7 +448,34 @@ class KeyboardControl(object):
                     _control.throttle = float(t[1])
                     _control.steer = float(t[2])
                     _control.brake = float(t[3])
-                    vehicles[n].apply_control(_control)
+                    if !bFirstVehicle
+                        vehicles[n].apply_control(_control)
+                    else
+                        # apply RSS check
+                        if len(vehicles)!=2:
+                            print("RSS check apply only on 2 vehicles scenario now!")
+                        v2 = vehicles[1]
+                        rinfo = xodrReader.roadinfo
+                        map = world.world.get_map()
+                        loc = v.get_location()
+                        speed = v.get_velocity()
+                        loc2 = v2.get_location()
+                        speed2 = v2.get_velocity()
+                        wp = map.get_waypoint(loc)
+                        rid = wp.road_id
+                        info = rinfo[rid]
+                        lane = rssw.Lane(info[0], info[1], info[2], info[3], info[4])
+                        speedv = math.sqrt(speed.x * speed.x + speed.y * speed.y)
+                        angle = math.atan(speed.y / speed.x) / math.pi * 180
+                        if speed.x < 0: angle += 180
+                        ego = rssw.Vehicle(speed.x, speed.y, angle, speedv)
+                        speedv2 = math.sqrt(speed2.x * speed2.x + speed2.y * speed2.y)
+                        angle2 = math.atan(speed2.y / speed2.x) / math.pi * 180
+                        if speed2.x < 0: angle2 += 180
+                        other =rssw.Vehicle(speed2.x, speed2.y, angle2, speedv2)
+                        rssw.RssCheck(lane, ego, other)
+                        vehicles[n].apply_control(_control)
+                        bFirstVehicle = False
                     delta = int(t[0])
                     timeRecord[n] += delta
                     #print("next",)
