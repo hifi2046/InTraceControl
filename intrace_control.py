@@ -134,8 +134,6 @@ except ImportError:
 import xodrReader
 import rssw
 
-xodrReader.load()
-
 # Global variables
 stage = 1
 bRecording = False
@@ -489,8 +487,8 @@ class KeyboardControl(object):
                         traceD2 += str(other)
                         # rss check & apply control
                         rssw.RssCheck(lane, ego, other)
-                        traceD3 = rssw.sWorld
-                        traceD4 = rssw.sSituation + rssw.sState + rssw.sResponse + rssw.sRestriction
+                        traceD3 = rssw.ssWorld()
+                        traceD4 = rssw.ssSituation() + rssw.ssState() + rssw.ssResponse() + rssw.ssRestriction()
                         vehicles[n].apply_control(_control)
                         bFirstVehicle = False
                     delta = int(t[0])
@@ -1041,6 +1039,8 @@ def main():
     logging.info('listening to server %s:%s', args.host, args.port)
 
     print(__doc__)
+    print("rssw", rssw.ssWorld())
+    xodrReader.load()
 
     try:
 
