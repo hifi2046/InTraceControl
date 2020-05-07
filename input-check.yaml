@@ -1,0 +1,22 @@
+D1:
+  velocity:
+    - speedx: 20
+      speedy: 0
+    - speedx: 20
+      speedy: 0
+D2:
+  lane:
+    x: 200
+    y: 200
+    length: 50
+    width: 5
+    heading: 0
+  vehicle:
+    - x: 100
+      y: 100
+      speedv: 20
+      angle: 0
+    - x: 100
+      y: 90
+      speedv: 20
+      angle: 0

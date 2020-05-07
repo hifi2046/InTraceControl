@@ -153,6 +153,11 @@ currentVehicle = 0
 sconfig = None
 vehicles = []
 timeOffset = []
+traceD1 = ""
+traceD2 = ""
+traceD3 = ""
+traceD4 = ""
+traceD5 =""
 
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
@@ -325,6 +330,7 @@ class KeyboardControl(object):
         global bReplaying, nReplay, nReplayOther, bReplayingOther, bufferReplay
         global timeRecord, timeReplay, timeRecordOther
         global currentVehicle, egoVehicle, otherVehicle, vehicles
+        global traceD1, traceD2, traceD3, traceD4, traceD5
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -370,7 +376,7 @@ class KeyboardControl(object):
                     timeReplay = 0
                     clock.get_time()
                 elif event.key == K_l:
-                    1# restart level
+                    1# log trace info to output
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key > K_0 and event.key <= K_9:
@@ -448,12 +454,13 @@ class KeyboardControl(object):
                     _control.throttle = float(t[1])
                     _control.steer = float(t[2])
                     _control.brake = float(t[3])
-                    if !bFirstVehicle
+                    if not bFirstVehicle:
                         vehicles[n].apply_control(_control)
-                    else
+                    else:
                         # apply RSS check
                         if len(vehicles)!=2:
                             print("RSS check apply only on 2 vehicles scenario now!")
+                        # calc: lane
                         v2 = vehicles[1]
                         rinfo = xodrReader.roadinfo
                         map = world.world.get_map()
@@ -465,15 +472,25 @@ class KeyboardControl(object):
                         rid = wp.road_id
                         info = rinfo[rid]
                         lane = rssw.Lane(info[0], info[1], info[2], info[3], info[4])
+                        traceD1 = str(speed)
+                        traceD2 = str(lane)
+                        # calc: vehicle
                         speedv = math.sqrt(speed.x * speed.x + speed.y * speed.y)
+                        if speed.x == 0: speed.x = 0.001
                         angle = math.atan(speed.y / speed.x) / math.pi * 180
                         if speed.x < 0: angle += 180
-                        ego = rssw.Vehicle(speed.x, speed.y, angle, speedv)
+                        ego = rssw.Vehicle(loc.x, loc.y, angle, speedv)
                         speedv2 = math.sqrt(speed2.x * speed2.x + speed2.y * speed2.y)
+                        if speed2.x == 0: speed2.x = 0.001
                         angle2 = math.atan(speed2.y / speed2.x) / math.pi * 180
                         if speed2.x < 0: angle2 += 180
-                        other =rssw.Vehicle(speed2.x, speed2.y, angle2, speedv2)
+                        other =rssw.Vehicle(loc2.x, loc2.y, angle2, speedv2)
+                        traceD2 += str(ego)
+                        traceD2 += str(other)
+                        # rss check & apply control
                         rssw.RssCheck(lane, ego, other)
+                        traceD3 = rssw.sWorld
+                        traceD4 = rssw.sSituation + rssw.sState + rssw.sResponse + rssw.sRestriction
                         vehicles[n].apply_control(_control)
                         bFirstVehicle = False
                     delta = int(t[0])
