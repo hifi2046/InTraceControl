@@ -27,8 +27,9 @@ Use ARROWS or WASD keys for control.
 
     B            : toggle in trace recording
     N            : in trace replaying
-    L            : restart level
+    L            : instantly output trace info
     K            : toggle ego/other vehicle
+    T            : toggle RSS check
 
     TAB          : change sensor position
     `            : next sensor
@@ -87,6 +88,9 @@ import random
 import re
 import weakref
 import yaml
+import xodrReader
+import rssw
+import pickle
 
 try:
     import pygame
@@ -120,6 +124,7 @@ try:
     from pygame.locals import K_q
     from pygame.locals import K_r
     from pygame.locals import K_s
+    from pygame.locals import K_t
     from pygame.locals import K_w
     from pygame.locals import K_MINUS
     from pygame.locals import K_EQUALS
@@ -130,9 +135,6 @@ try:
     import numpy as np
 except ImportError:
     raise RuntimeError('cannot import numpy, make sure numpy package is installed')
-
-import xodrReader
-import rssw
 
 # Global variables
 stage = 1
@@ -156,6 +158,10 @@ traceD2 = ""
 traceD3 = ""
 traceD4 = ""
 traceD5 =""
+nn = 0
+egoControl = None
+bRssSwitch = False
+rssLog = []
 
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
@@ -229,7 +235,7 @@ class World(object):
         fconfig = open("scene-config.yaml", "r")
         data = fconfig.read()
         sconfig = yaml.load(data)
-        print(yaml.dump(sconfig))
+        # print(yaml.dump(sconfig))
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -241,7 +247,7 @@ class World(object):
         timeOffset.clear()
         n = 0
         for v in sconfig:
-            print(v["type"], v["color"], colormap[v["color"]], v["location"], v["rotation"])
+            #print(v["type"], v["color"], colormap[v["color"]], v["location"], v["rotation"])
             bp = self.world.get_blueprint_library().filter(v["type"])[0]
             bp.set_attribute('role_name', self.actor_role_name)
             bp.set_attribute('color', colormap[v["color"]])
@@ -249,7 +255,7 @@ class World(object):
             rot = v["rotation"]
             sp = carla.Transform(carla.Location(loc[0],loc[1],loc[2]), carla.Rotation(rot[0],rot[1],rot[2]))
             #sp = self.map.get_spawn_points()[1]
-            print( bp, sp )
+            # print( bp, sp )
             vehicle = self.world.try_spawn_actor(bp, sp)
             if vehicle is None:
                 print( "vehicle %d spawn fail!" % n )
@@ -329,6 +335,8 @@ class KeyboardControl(object):
         global timeRecord, timeReplay, timeRecordOther
         global currentVehicle, egoVehicle, otherVehicle, vehicles
         global traceD1, traceD2, traceD3, traceD4, traceD5
+        global nn, egoControl, bRssSwitch
+        global rssLog
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -373,14 +381,23 @@ class KeyboardControl(object):
                     timeRecord = [0 for i in range(count)]
                     timeReplay = 0
                     clock.get_time()
+                    nn = 0
+                    egoControl = carla.VehicleControl()
                 elif event.key == K_l:
-                    1# log trace info to output
+                    # log trace info to output
+                    print("D1:\n" + traceD1)
+                    print("D2:\n" + traceD2)
+                    print("D3:\n" + traceD3)
+                    print("D4:\n" + traceD4)
+                    print("D5:\n" + traceD5)
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key > K_0 and event.key <= K_9:
                     world.camera_manager.set_sensor(event.key - 1 - K_0)
                 elif event.key == K_r and not (pygame.key.get_mods() & KMOD_CTRL):
                     world.camera_manager.toggle_recording()
+                elif event.key == K_t and not (pygame.key.get_mods() & KMOD_CTRL):
+                    bRssSwitch = not bRssSwitch
                 elif event.key == K_r and (pygame.key.get_mods() & KMOD_CTRL):
                     if (world.recording_enabled):
                         client.stop_recorder()
@@ -438,8 +455,8 @@ class KeyboardControl(object):
             deltaNow = clock.get_time()
             timeReplay += deltaNow
             # replay time step
-            n =0
-            bFirstVehicle = True
+            n = 0
+            #bFirstVehicle = True
             for v in vehicles:
                 while( timeReplay >= timeRecord[n] + timeOffset[n] ):
                     nReplay[n] += 1
@@ -452,9 +469,16 @@ class KeyboardControl(object):
                     _control.throttle = float(t[1])
                     _control.steer = float(t[2])
                     _control.brake = float(t[3])
-                    if not bFirstVehicle:
+                    if n != 0:
                         vehicles[n].apply_control(_control)
-                    else:
+                        #if n == 0: print( "error other vehicle" )
+                    elif nn % 10 != 0:
+                        #print("skip tick %d:%f %f %f" % (nn, egoControl.throttle, egoControl.brake, egoControl.steer))
+                        vehicles[n].apply_control(egoControl)
+                        #if n != 0: print( "error skip tick" )
+                        #bFirstVehicle = False
+                        nn += 1
+                    elif bRssSwitch:
                         # apply RSS check
                         if len(vehicles)!=2:
                             print("RSS check apply only on 2 vehicles scenario now!")
@@ -468,10 +492,11 @@ class KeyboardControl(object):
                         speed2 = v2.get_velocity()
                         wp = map.get_waypoint(loc)
                         rid = wp.road_id
+                        lid = wp.lane_id
                         info = rinfo[rid]
-                        lane = rssw.Lane(info[0], info[1], info[2], info[3], info[4])
-                        traceD1 = str(speed)
-                        traceD2 = str(lane)
+                        lane = rssw.Lane(info[0], info[1], info[2], info[3], info[4], lid)
+                        traceD1 = "velocity[0]:" + str(speed) + "\nvelocity[1]:" + str(speed2)
+                        traceD2 = "Lane(x=%f, y=%f, length=%f, width=%f, heading=%f, lid=%d" % (lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id)
                         # calc: vehicle
                         speedv = math.sqrt(speed.x * speed.x + speed.y * speed.y)
                         if speed.x == 0: speed.x = 0.001
@@ -483,14 +508,37 @@ class KeyboardControl(object):
                         angle2 = math.atan(speed2.y / speed2.x) / math.pi * 180
                         if speed2.x < 0: angle2 += 180
                         other =rssw.Vehicle(loc2.x, loc2.y, angle2, speedv2)
-                        traceD2 += str(ego)
-                        traceD2 += str(other)
+                        traceD2 += "\nVehicle[0](x=%f, y=%f, heading=%f, velocity=%f" % (ego.x, ego.y, ego.heading, ego.velocity)
+                        traceD2 += "\nVehicle[1](x=%f, y=%f, heading=%f, velocity=%f" % (other.x, other.y, other.heading, other.velocity)
                         # rss check & apply control
-                        rssw.RssCheck(lane, ego, other)
+                        control = rssw.VControl()
+                        rssw.RssCheck(lane, ego, other, control)
+                        record = [[lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id], [ego.x, ego.y, ego.heading, ego.velocity], [other.x, other.y, other.heading, other.velocity], [control.throttle, control.brake, control.steer]]
+                        rssLog.append(record)
                         traceD3 = rssw.ssWorld()
-                        traceD4 = rssw.ssSituation() + rssw.ssState() + rssw.ssResponse() + rssw.ssRestriction()
+                        traceD4 = rssw.ssSituation() + "\n" + rssw.ssState() + "\n" + rssw.ssResponse() + "\n" + rssw.ssRestriction()
+                        traceD5 = control.str()
+                        if control.throttle != -1: _control.throttle = control.throttle
+                        if control.brake != -1: _control.brake = control.brake
+                        if control.steer != -1: _control.steer = control.steer
                         vehicles[n].apply_control(_control)
-                        bFirstVehicle = False
+                        #if n != 0: print( "error ego replay" )
+                        egoControl.throttle = _control.throttle
+                        egoControl.brake = _control.brake
+                        egoControl.steer = _control.steer
+                        if _control.brake != 0 or _control.steer != 0:
+                            world.hud.notification("Danger with brake " + str(_control.brake) + ", steer " + str(_control.steer) + ", throttle " + str(_control.throttle))
+                            print("Danger with brake " + str(_control.brake) + ", steer " + str(_control.steer) + ", throttle " + str(_control.throttle))
+                        #bFirstVehicle = False
+                        nn += 1
+                    else:
+                        vehicles[n].apply_control(_control)
+                        egoControl.throttle = _control.throttle
+                        egoControl.brake = _control.brake
+                        egoControl.steer = _control.steer
+                        #if n != 0: print( "error not rss mode" )
+                        #bFirstVehicle = False
+                        nn += 1
                     delta = int(t[0])
                     timeRecord[n] += delta
                     #print("next",)
@@ -605,6 +653,7 @@ class HUD(object):
             'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
             'Map:     % 20s' % world.map.name,
             'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
+            'Rss mode: On' if bRssSwitch else "Rss mode: Off",
             '',
             'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
             u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (t.rotation.yaw, heading),
@@ -612,7 +661,7 @@ class HUD(object):
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % t.location.z,
             '',
-            'Road %d!%d' % (rid, lid) + ' (%.1f,%.1f) len %f wid %f hdg %f' % rd,
+            'Road %d!%d' % (rid, lid) + ' (%.1f,%.1f)\n len %f wid %f hdg %f' % rd,
             'Junc %d' % ju.id if bJunc else '',
             '']
         if isinstance(c, carla.VehicleControl):
@@ -950,6 +999,7 @@ class CameraManager(object):
 
 
 def game_loop(args):
+    global rssLog
     pygame.init()
     pygame.font.init()
     world = None
@@ -970,6 +1020,9 @@ def game_loop(args):
         while True:
             clock.tick_busy_loop(60)
             if controller.parse_events(client, world, clock):
+                f=open("rsscheck.log", "wb")
+                pickle.dump(rssLog, f)
+                f.close()
                 return
             world.tick(clock)
             world.render(display)
@@ -992,6 +1045,9 @@ def game_loop(args):
 
 
 def main():
+#    lane = rssw.Lane(1,2,3,4,5)
+#    print(lane.str())
+#    print(lane.sum())
     argparser = argparse.ArgumentParser(
         description='CARLA Manual Control Client')
     argparser.add_argument(
@@ -1039,9 +1095,8 @@ def main():
     logging.info('listening to server %s:%s', args.host, args.port)
 
     print(__doc__)
-    print("rssw", rssw.ssWorld())
     xodrReader.load()
-
+    
     try:
 
         game_loop(args)
