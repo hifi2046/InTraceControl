@@ -12,7 +12,7 @@ for t in d:
 #    print(t[2])
     print(t[3])
 #exit(1)
-t=d[5]
+t=d[4]
 lane=rssw.Lane(t[0][0], t[0][1], t[0][2], t[0][3], t[0][4], t[0][5])
 ego=rssw.Vehicle(t[1][0], t[1][1], t[1][2], t[1][3])
 other=rssw.Vehicle(t[2][0], t[2][1], t[2][2], t[2][3])

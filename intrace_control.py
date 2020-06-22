@@ -60,6 +60,7 @@ from __future__ import print_function
 import glob
 import os
 import sys
+import time
 
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -472,25 +473,29 @@ class KeyboardControl(object):
                     if n != 0:
                         vehicles[n].apply_control(_control)
                         #if n == 0: print( "error other vehicle" )
-                    elif nn % 10 != 0:
+                    #elif nn % 10 != 0:
                         #print("skip tick %d:%f %f %f" % (nn, egoControl.throttle, egoControl.brake, egoControl.steer))
-                        vehicles[n].apply_control(egoControl)
+                        #vehicles[n].apply_control(egoControl)
                         #if n != 0: print( "error skip tick" )
                         #bFirstVehicle = False
-                        nn += 1
+                        #nn += 1
                     elif bRssSwitch:
                         # apply RSS check
                         if len(vehicles)!=2:
                             print("RSS check apply only on 2 vehicles scenario now!")
                         # calc: lane
+                        t0 = time.time() * 1000
                         v2 = vehicles[1]
                         rinfo = xodrReader.roadinfo
-                        map = world.world.get_map()
+                        map = world.map
+                        t001 = time.time() * 1000
                         loc = v.get_location()
                         speed = v.get_velocity()
                         loc2 = v2.get_location()
                         speed2 = v2.get_velocity()
+                        t002 = time.time() * 1000
                         wp = map.get_waypoint(loc)
+                        t003 = time.time() * 1000
                         rid = wp.road_id
                         lid = wp.lane_id
                         info = rinfo[rid]
@@ -498,13 +503,17 @@ class KeyboardControl(object):
                         traceD1 = "velocity[0]:" + str(speed) + "\nvelocity[1]:" + str(speed2)
                         traceD2 = "Lane(x=%f, y=%f, length=%f, width=%f, heading=%f, lid=%d" % (lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id)
                         # calc: vehicle
+                        t01 = time.time() * 1000
                         speedv = math.sqrt(speed.x * speed.x + speed.y * speed.y)
                         if speed.x == 0: speed.x = 0.001
+                        t02 = time.time() * 1000
                         angle = math.atan(speed.y / speed.x) / math.pi * 180
                         if speed.x < 0: angle += 180
                         ego = rssw.Vehicle(loc.x, loc.y, angle, speedv)
+                        t03 = time.time() * 1000
                         speedv2 = math.sqrt(speed2.x * speed2.x + speed2.y * speed2.y)
                         if speed2.x == 0: speed2.x = 0.001
+                        t04 = time.time() * 1000
                         angle2 = math.atan(speed2.y / speed2.x) / math.pi * 180
                         if speed2.x < 0: angle2 += 180
                         other =rssw.Vehicle(loc2.x, loc2.y, angle2, speedv2)
@@ -512,7 +521,9 @@ class KeyboardControl(object):
                         traceD2 += "\nVehicle[1](x=%f, y=%f, heading=%f, velocity=%f" % (other.x, other.y, other.heading, other.velocity)
                         # rss check & apply control
                         control = rssw.VControl()
+                        t1 = time.time() * 1000
                         rssw.RssCheck(lane, ego, other, control)
+                        t2 = time.time() * 1000
                         record = [[lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id], [ego.x, ego.y, ego.heading, ego.velocity], [other.x, other.y, other.heading, other.velocity], [control.throttle, control.brake, control.steer]]
                         rssLog.append(record)
                         traceD3 = rssw.ssWorld()
@@ -522,6 +533,8 @@ class KeyboardControl(object):
                         if control.brake != -1: _control.brake = control.brake
                         if control.steer != -1: _control.steer = control.steer
                         vehicles[n].apply_control(_control)
+                        t3 = time.time() * 1000
+                        #print("%dms %dms %dms %dms" % (t001-t0, t002-t001, t003-t002, t01-t003))
                         #if n != 0: print( "error ego replay" )
                         egoControl.throttle = _control.throttle
                         egoControl.brake = _control.brake
@@ -639,7 +652,7 @@ class HUD(object):
         vehicles = world.world.get_actors().filter('vehicle.*')
         # add road info
         rinfo = xodrReader.roadinfo
-        map = world.world.get_map()
+        map = world.map
         wp = map.get_waypoint(t.location)
         rid = wp.road_id
         lid = wp.lane_id
@@ -661,7 +674,8 @@ class HUD(object):
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % t.location.z,
             '',
-            'Road %d!%d' % (rid, lid) + ' (%.1f,%.1f)\n len %f wid %f hdg %f' % rd,
+            'Road %d!%d' % (rid, lid) + ' loc (%.1f,%.1f)' % (rd[0], rd[1]),
+            'len %.1f wid %.1f hdg %.1f' % rd[2:],
             'Junc %d' % ju.id if bJunc else '',
             '']
         if isinstance(c, carla.VehicleControl):
