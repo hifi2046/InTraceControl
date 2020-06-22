@@ -2,11 +2,11 @@
   location: [225.3, -364.1, 2.2]
   rotation: [0, -0.3, 0]
   start_time: 0
-  type: isetta
-  color: red
+  type: model3
+  color: orange
 - filename: log/s2.1-1.log
   location: [230.3, -367.1, 2.2]
   rotation: [0, -0.3, 0]
   start_time: 0
-  type: isetta
-  color: blue
+  type: model3
+  color: lightgreen

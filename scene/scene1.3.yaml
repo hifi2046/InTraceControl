@@ -1,12 +1,12 @@
-- filename: log/s1.2-0.log
-  location: [205.3, -370.1, 2.2]
-  rotation: [0, -0.3, 0]
+- filename: log/s1.3-0.log
+  location: [-356.9, 31.0, 2.2]
+  rotation: [0, 1, 0]
   start_time: 0
   type: isetta
-  color: red
-- filename: log/s1.2-1.log
-  location: [225.3, -370.1, 2.2]
-  rotation: [0, -0.3, 0]
+  color: purple
+- filename: log/s1.3-1.log
+  location: [-336.9, 31.0, 2.2]
+  rotation: [0, 1, 0]
   start_time: 0
-  type: isetta
-  color: blue
+  type: cooperst
+  color: pink
