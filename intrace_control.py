@@ -57,6 +57,7 @@ from __future__ import print_function
 # ==============================================================================
 
 
+import xodrReader
 import glob
 import os
 import sys
@@ -75,6 +76,7 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
+import rssw
 
 import carla
 
@@ -89,8 +91,6 @@ import random
 import re
 import weakref
 import yaml
-import xodrReader
-import rssw
 import pickle
 
 try:
@@ -243,9 +243,9 @@ class World(object):
         # Spawn vehicles according to the scene config
         if self.player is not None:
             self.destroy()
-        vehicles.clear()
-        bufferReplay.clear()
-        timeOffset.clear()
+        vehicles[:]=[]
+        bufferReplay[:]=[]
+        timeOffset[:]=[]
         n = 0
         for v in sconfig:
             #print(v["type"], v["color"], colormap[v["color"]], v["location"], v["rotation"])
@@ -499,7 +499,9 @@ class KeyboardControl(object):
                         rid = wp.road_id
                         lid = wp.lane_id
                         info = rinfo[rid]
+                        print(info, lid)
                         lane = rssw.Lane(info[0], info[1], info[2], info[3], info[4], lid)
+                        print("rssw ok")
                         traceD1 = "velocity[0]:" + str(speed) + "\nvelocity[1]:" + str(speed2)
                         traceD2 = "Lane(x=%f, y=%f, length=%f, width=%f, heading=%f, lid=%d" % (lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id)
                         # calc: vehicle
@@ -521,8 +523,10 @@ class KeyboardControl(object):
                         traceD2 += "\nVehicle[1](x=%f, y=%f, heading=%f, velocity=%f" % (other.x, other.y, other.heading, other.velocity)
                         # rss check & apply control
                         control = rssw.VControl()
+                        restriction = rssw.Restriction()
                         t1 = time.time() * 1000
-                        rssw.RssCheck(lane, ego, other, control)
+                        rssw.RssCheck(lane, ego, other, restriction)
+                        rssw.RssRestrict(restriction, control)
                         t2 = time.time() * 1000
                         record = [[lane.x, lane.y, lane.length, lane.width, lane.heading, lane.id], [ego.x, ego.y, ego.heading, ego.velocity], [other.x, other.y, other.heading, other.velocity], [control.throttle, control.brake, control.steer]]
                         rssLog.append(record)
@@ -1059,8 +1063,8 @@ def game_loop(args):
 
 
 def main():
-#    lane = rssw.Lane(1,2,3,4,5)
-#    print(lane.str())
+    lane = rssw.Lane(1,2,3,4,5,6)
+    print(lane.str())
 #    print(lane.sum())
     argparser = argparse.ArgumentParser(
         description='CARLA Manual Control Client')
@@ -1110,6 +1114,8 @@ def main():
 
     print(__doc__)
     xodrReader.load()
+#    lane = rssw.Lane(1,2,3,4,5,6)
+#    print(lane.str())
     
     try:
 
